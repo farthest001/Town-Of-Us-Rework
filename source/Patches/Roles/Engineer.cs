@@ -1,4 +1,4 @@
-using UnityEngine;
+using TMPro;
 
 namespace TownOfUs.Roles
 {
@@ -7,12 +7,17 @@ namespace TownOfUs.Roles
         public Engineer(PlayerControl player) : base(player)
         {
             Name = "Engineer";
-            ImpostorText = () => "Maintain important systems on the ship";
-            TaskText = () => "Vent and fix a sabotage from anywhere!";
-            Color = new Color(1f, 0.65f, 0.04f, 1f);
+            ImpostorText = () => "Maintain Important Systems On The Ship";
+            TaskText = () => "Vent around and fix sabotages";
+            Color = Patches.Colors.Engineer;
             RoleType = RoleEnum.Engineer;
+            AddToRoleHistory(RoleType);
+            UsesLeft = CustomGameOptions.MaxFixes;
         }
 
-        public bool UsedThisRound { get; set; } = false;
+        public int UsesLeft;
+        public TextMeshPro UsesText;
+
+        public bool ButtonUsable => UsesLeft != 0;
     }
 }

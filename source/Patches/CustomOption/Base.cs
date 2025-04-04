@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using Reactor.Localization.Utilities;
+using Reactor.Utilities;
 
 namespace TownOfUs.CustomOption
 {
@@ -7,15 +9,18 @@ namespace TownOfUs.CustomOption
     {
         public static List<CustomOption> AllOptions = new List<CustomOption>();
         public readonly int ID;
+        public readonly MultiMenu Menu;
 
         public Func<object, string> Format;
         public string Name;
 
+        public StringNames StringName;
 
-        protected internal CustomOption(int id, string name, CustomOptionType type, object defaultValue,
+        protected internal CustomOption(int id, MultiMenu menu, string name, CustomOptionType type, object defaultValue,
             Func<object, string> format = null)
         {
             ID = id;
+            Menu = menu;
             Name = name;
             Type = type;
             DefaultValue = Value = defaultValue;
@@ -24,16 +29,14 @@ namespace TownOfUs.CustomOption
             if (Type == CustomOptionType.Button) return;
             AllOptions.Add(this);
             Set(Value);
+
+            StringName = CustomStringName.CreateAndRegister(name);
         }
 
         protected internal object Value { get; set; }
         protected internal OptionBehaviour Setting { get; set; }
         protected internal CustomOptionType Type { get; set; }
         public object DefaultValue { get; set; }
-
-        public static bool LobbyTextScroller { get; set; } = true;
-
-        protected internal bool Indent { get; set; }
 
         public override string ToString()
         {
@@ -52,7 +55,7 @@ namespace TownOfUs.CustomOption
 
             Value = value;
 
-            if (Setting != null && AmongUsClient.Instance.AmHost && SendRpc) Rpc.SendRpc(this);
+            if (Setting != null && AmongUsClient.Instance.AmHost && SendRpc) Coroutines.Start(Rpc.SendRpc(this));
 
             try
             {
@@ -79,6 +82,11 @@ namespace TownOfUs.CustomOption
             }
             catch
             {
+            }
+
+            if (HudManager.InstanceExists && Type != CustomOptionType.Header)
+            {
+                HudManager.Instance.Notifier.AddSettingsChangeMessage(StringName, ToString());
             }
         }
     }

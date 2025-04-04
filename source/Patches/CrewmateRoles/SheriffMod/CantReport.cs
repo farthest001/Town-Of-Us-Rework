@@ -18,7 +18,7 @@ namespace TownOfUs.CrewmateRoles.SheriffMod
 
             var data = __instance.Data;
             var stuff = Physics2D.OverlapCircleAll(truePosition, __instance.MaxReportDistance, Constants.Usables);
-            var flag = (PlayerControl.GameOptions.GhostsDoTasks || !data.IsDead) &&
+            var flag = (GameOptionsManager.Instance.currentNormalGameOptions.GhostsDoTasks || !data.IsDead) &&
                        (!AmongUsClient.Instance || !AmongUsClient.Instance.IsGameOver) && __instance.CanMove;
             var flag2 = false;
 
@@ -30,7 +30,9 @@ namespace TownOfUs.CrewmateRoles.SheriffMod
                     if (Vector2.Distance(truePosition, component.TruePosition) <= __instance.MaxReportDistance)
                     {
                         var matches = Murder.KilledPlayers.FirstOrDefault(x => x.PlayerId == component.ParentId);
-                        if (matches != null && matches.KillerId != PlayerControl.LocalPlayer.PlayerId) flag2 = true;
+                        if (matches != null && matches.KillerId != PlayerControl.LocalPlayer.PlayerId) { 
+                            if (!PhysicsHelpers.AnythingBetween(__instance.Collider, truePosition, component.TruePosition, Constants.ShipOnlyMask, false)) flag2 = true; 
+                        }
                     }
                 }
 

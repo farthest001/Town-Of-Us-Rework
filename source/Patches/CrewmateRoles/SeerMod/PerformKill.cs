@@ -1,15 +1,15 @@
 ﻿using System;
 using HarmonyLib;
-using Hazel;
 using TownOfUs.Roles;
 using UnityEngine;
+using AmongUs.GameOptions;
 
 namespace TownOfUs.CrewmateRoles.SeerMod
 {
-    [HarmonyPatch(typeof(KillButtonManager), nameof(KillButtonManager.PerformKill))]
+    [HarmonyPatch(typeof(KillButton), nameof(KillButton.DoClick))]
     public class PerformKill
     {
-        public static bool Prefix(KillButtonManager __instance)
+        public static bool Prefix(KillButton __instance)
         {
             if (__instance != DestroyableSingleton<HudManager>.Instance.KillButton) return true;
             var flag = PlayerControl.LocalPlayer.Is(RoleEnum.Seer);
@@ -19,21 +19,28 @@ namespace TownOfUs.CrewmateRoles.SeerMod
             var flag2 = role.SeerTimer() == 0f;
             if (!flag2) return false;
             if (!__instance.enabled) return false;
-            var maxDistance = GameOptionsData.KillDistances[PlayerControl.GameOptions.KillDistance];
+            var maxDistance = GameOptionsData.KillDistances[GameOptionsManager.Instance.currentNormalGameOptions.KillDistance];
             if (Vector2.Distance(role.ClosestPlayer.GetTruePosition(),
                 PlayerControl.LocalPlayer.GetTruePosition()) > maxDistance) return false;
             if (role.ClosestPlayer == null) return false;
-            var playerId = role.ClosestPlayer.PlayerId;
 
-
-            var writer = AmongUsClient.Instance.StartRpcImmediately(PlayerControl.LocalPlayer.NetId,
-                (byte) CustomRPC.Investigate, SendOption.Reliable, -1);
-            writer.Write(PlayerControl.LocalPlayer.PlayerId);
-            writer.Write(playerId);
-            AmongUsClient.Instance.FinishRpcImmediately(writer);
-
-            role.Investigated.Add(role.ClosestPlayer.PlayerId);
-            role.LastInvestigated = DateTime.UtcNow;
+            var interact = Utils.Interact(PlayerControl.LocalPlayer, role.ClosestPlayer);
+            if (interact[4] == true)
+            {
+                role.Investigated.Add(role.ClosestPlayer.PlayerId);
+            }
+            if (interact[0] == true)
+            {
+                role.LastInvestigated = DateTime.UtcNow;
+                return false;
+            }
+            else if (interact[1] == true)
+            {
+                role.LastInvestigated = DateTime.UtcNow;
+                role.LastInvestigated = role.LastInvestigated.AddSeconds(CustomGameOptions.ProtectKCReset - CustomGameOptions.SeerCd);
+                return false;
+            }
+            else if (interact[3] == true) return false;
             return false;
         }
     }

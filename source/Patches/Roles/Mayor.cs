@@ -1,29 +1,43 @@
-using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
+using TownOfUs.Extensions;
 
 namespace TownOfUs.Roles
 {
     public class Mayor : Role
     {
-        public List<byte> ExtraVotes = new List<byte>();
-
         public Mayor(PlayerControl player) : base(player)
         {
             Name = "Mayor";
-            ImpostorText = () => "Save your votes to double vote";
-            TaskText = () => "Save your votes to vote multiple times";
-            Color = new Color(0.44f, 0.31f, 0.66f, 1f);
+            ImpostorText = () => "Reveal Yourself To Save The Town";
+            TaskText = () => "Lead the town to victory";
+            Color = Patches.Colors.Mayor;
             RoleType = RoleEnum.Mayor;
-            VoteBank = CustomGameOptions.MayorVoteBank;
+            AddToRoleHistory(RoleType);
+            Revealed = false;
+        }
+        public bool Revealed { get; set; }
+
+        public GameObject RevealButton = new GameObject();
+
+        internal override bool Criteria()
+        {
+            return Revealed && !Player.Data.IsDead || base.Criteria();
         }
 
-        public int VoteBank { get; set; }
-        public bool SelfVote { get; set; }
+        internal override bool RoleCriteria()
+        {
+            if (!Player.Data.IsDead) return Revealed || base.RoleCriteria();
+            return false || base.RoleCriteria();
+        }
 
-        public bool VotedOnce { get; set; }
+        internal override bool GameEnd(LogicGameFlowNormal __instance)
+        {
+            if (Player.Data.IsDead || Player.Data.Disconnected || !CustomGameOptions.CrewKillersContinue) return true;
 
-        public PlayerVoteArea Abstain { get; set; }
+            if (PlayerControl.AllPlayerControls.ToArray().Count(x => !x.Data.IsDead && !x.Data.Disconnected && x.Data.IsImpostor()) > 0) return false;
 
-        public bool CanVote => VoteBank > 0 && !SelfVote;
+            return true;
+        }
     }
 }

@@ -1,39 +1,38 @@
-﻿using System;
-using HarmonyLib;
+﻿using HarmonyLib;
 using UnityEngine;
-using UnityEngine.Events;
-using Object = UnityEngine.Object;
 
 namespace TownOfUs.RainbowMod
 {
-    [HarmonyPatch(typeof(PlayerTab), nameof(PlayerTab.OnEnable))]
-    public class PlayerTabPatch
+    [HarmonyPatch(typeof(PlayerTab))]
+    public static class PlayerTabPatch
     {
-        public static bool Prefix(PlayerTab __instance)
+        [HarmonyPostfix]
+        [HarmonyPatch(nameof(PlayerTab.OnEnable))]
+        public static void OnEnablePostfix(PlayerTab __instance)
         {
-            PlayerControl.SetPlayerMaterialColors(PlayerControl.LocalPlayer.Data.ColorId, __instance.DemoImage);
-            __instance.HatImage.SetHat(SaveManager.LastHat, PlayerControl.LocalPlayer.Data.ColorId);
-            PlayerControl.SetSkinImage(SaveManager.LastSkin, __instance.SkinImage);
-            PlayerControl.SetPetImage(SaveManager.LastPet, PlayerControl.LocalPlayer.Data.ColorId, __instance.PetImage);
-            var colors = Palette.PlayerColors;
-            var num = colors.Length / 4f;
-            for (int i = 0;i < colors.Length;i++)
+            for (int i = 0; i < __instance.ColorChips.Count; i++)
             {
-                var x = __instance.XRange.Lerp((i % 4) / 4f) + 0.25f;
-                var y = __instance.YStart - (i / 4) * 0.55f;
-                var colorChip = Object.Instantiate(__instance.ColorTabPrefab, __instance.ColorTabArea, true);
+                var colorChip = __instance.ColorChips[i];
                 colorChip.transform.localScale *= 0.8f;
+                var x = __instance.XRange.Lerp((i % 5) / 5f) + 0.25f;
+                var y = __instance.YStart - (i / 5) * 0.55f;
                 colorChip.transform.localPosition = new Vector3(x, y, -1f);
-                var colorId = (byte)i;
-                colorChip.Button.OnClick.AddListener((Action) (() =>
-                {
-                    __instance.SelectColor(colorId);
-                    if (colorId <= 17) SaveManager.BodyColor = colorId;
-                }));
-                colorChip.Inner.color = colors[i];
-                __instance.ColorChips.Add(colorChip);
             }
-            return false;
+        }
+
+        [HarmonyPostfix]
+        [HarmonyPatch(nameof(PlayerTab.Update))]
+        public static void UpdatePostfix(PlayerTab __instance)
+        {
+            for (int i = 0; i < __instance.ColorChips.Count; i++)
+            {
+                if (RainbowUtils.IsRainbow(i))
+                {
+                    __instance.ColorChips[i].Inner.SpriteColor = RainbowUtils.Rainbow;
+                    break;
+                }
+            }
+
         }
     }
 }

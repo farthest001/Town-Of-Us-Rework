@@ -5,10 +5,9 @@ using UnityEngine;
 
 namespace TownOfUs.CrewmateRoles.InvestigatorMod
 {
-    [HarmonyPatch(typeof(PlayerControl), nameof(PlayerControl.FixedUpdate))]
+    [HarmonyPatch(typeof(HudManager), nameof(HudManager.Update))]
     public static class AddPrints
     {
-        private const float PeriodInterval = 0.25f;
         private static float _time;
 
         public static bool GameStarted = false;
@@ -21,11 +20,19 @@ namespace TownOfUs.CrewmateRoles.InvestigatorMod
         }
 
 
-        public static void Postfix(PlayerControl __instance)
+        public static void Postfix(HudManager __instance)
         {
-            if (!GameStarted || !PlayerControl.LocalPlayer.Is(RoleEnum.Investigator)) return;
+            if ((GameManager.Instance && !GameManager.Instance.GameHasStarted) || !PlayerControl.LocalPlayer.Is(RoleEnum.Investigator)) return;
+            if (MeetingHud.Instance) return;
             // New Footprint
             var investigator = Role.GetRole<Investigator>(PlayerControl.LocalPlayer);
+
+            if (PlayerControl.LocalPlayer.Data.IsDead)
+            {
+                Footprint.DestroyAll(investigator);
+                return;
+            }
+
             _time += Time.deltaTime;
             if (_time >= Interval)
             {
@@ -34,6 +41,7 @@ namespace TownOfUs.CrewmateRoles.InvestigatorMod
                 {
                     if (player == null || player.Data.IsDead ||
                         player.PlayerId == PlayerControl.LocalPlayer.PlayerId) continue;
+                    if ((player.Is(RoleEnum.Swooper) && Role.GetRole<Swooper>(player).IsSwooped) || PlayerControl.LocalPlayer.IsHypnotised()) continue;
                     var canPlace = !investigator.AllPrints.Any(print =>
                         Vector3.Distance(print.Position, Position(player)) < 0.5f &&
                         print.Color.a > 0.5 &&
@@ -46,14 +54,20 @@ namespace TownOfUs.CrewmateRoles.InvestigatorMod
 
                     if (canPlace) new Footprint(player, investigator);
                 }
-            }
 
-            // Update
-
-            for (var i = 0; i < investigator.AllPrints.Count; i++)
-            {
-                var footprint = investigator.AllPrints[i];
-                if (footprint.Update()) i--;
+                for (var i = 0; i < investigator.AllPrints.Count; i++)
+                {
+                    try
+                    {
+                        var footprint = investigator.AllPrints[i];
+                        if (footprint.Update()) i--;
+                    } catch
+                    {
+                        //assume footprint value is null and allow the loop to continue
+                        continue;
+                    }
+                    
+                }
             }
         }
     }

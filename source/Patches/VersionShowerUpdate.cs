@@ -1,4 +1,5 @@
 using HarmonyLib;
+using UnityEngine;
 
 namespace TownOfUs
 {
@@ -9,8 +10,24 @@ namespace TownOfUs
         public static void Postfix(VersionShower __instance)
         {
             var text = __instance.text;
-            //text.text += "\nloaded <color=#FFBFCCFF>T[FF80D5FF]o[FFCC00FF]w[704FA8FF]n[FF0000FF] of[CC4D00FF] Us [FFFFFFFF]by [00FF00FF]slushiegoose[FFFFFFFF] </color>;
-            text.text += " - <color=#00FF00FF>TownOfUs v2.2.1</color>";
+            text.text += " - <color=#00FF00FF>TownOfUs v" + TownOfUs.VersionString + "</color>" + TownOfUs.VersionTag;
+            text.transform.localPosition += new Vector3(-0.8f, -0.16f, 0f);
+
+            if (GameObject.Find("RightPanel"))
+            {
+                text.transform.SetParent(GameObject.Find("RightPanel").transform);
+
+                var aspect = text.gameObject.AddComponent<AspectPosition>();
+                aspect.Alignment = AspectPosition.EdgeAlignments.Top;
+                aspect.DistanceFromEdge = new Vector3(-0.2f, 2.5f, 8f);
+
+                aspect.StartCoroutine(Effects.Lerp(0.1f, new System.Action<float>((p) =>
+                {
+                    aspect.AdjustPosition();
+                })));
+
+                return;
+            }
         }
     }
 }

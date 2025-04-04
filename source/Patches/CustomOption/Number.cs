@@ -5,19 +5,12 @@ namespace TownOfUs.CustomOption
 {
     public class CustomNumberOption : CustomOption
     {
-        protected internal CustomNumberOption(int id, string name, float value, float min, float max, float increment,
-            Func<object, string> format = null) : base(id, name, CustomOptionType.Number, value, format)
+        protected internal CustomNumberOption(int id, MultiMenu menu, string name, float value, float min, float max, float increment,
+            Func<object, string> format = null) : base(id, menu, name, CustomOptionType.Number, value, format)
         {
             Min = min;
             Max = max;
             Increment = increment;
-        }
-
-        protected internal CustomNumberOption(bool indent, int id, string name, float value, float min, float max,
-            float increment,
-            Func<object, string> format = null) : this(id, name, value, min, max, increment, format)
-        {
-            Indent = indent;
         }
 
         protected float Min { get; set; }
@@ -26,32 +19,33 @@ namespace TownOfUs.CustomOption
 
         protected internal float Get()
         {
-            return (float) Value;
+            return (float)Value;
         }
 
-       
         protected internal void Increase()
         {
-            var increment = Increment > 5 && Input.GetKeyInt(KeyCode.LeftShift)
-                ? 5
-                : Increment;
-            Set(Mathf.Clamp(Get() + increment, Min, Max));
+            var increment = Increment > 5 && Input.GetKeyInt(KeyCode.LeftShift) ? 5 : Increment;
+
+            if (Get() + increment > Max + 0.001f) // the slight increase is because of the stupid float rounding errors in the Giant speed
+                Set(Min);
+            else
+                Set(Get() + increment);
         }
 
         protected internal void Decrease()
         {
-            var increment = Increment > 5 && Input.GetKeyInt(KeyCode.LeftShift)
-                ? 5
-                : Increment;
-            Set(Mathf.Clamp(Get() - increment, Min, Max));
+            var increment = Increment > 5 && Input.GetKeyInt(KeyCode.LeftShift) ? 5 : Increment;
+
+            if (Get() - increment < Min - 0.001f) // added it here to in case I missed something else
+                Set(Max);
+            else
+                Set(Get() - increment);
         }
 
         public override void OptionCreated()
         {
             base.OptionCreated();
             var number = Setting.Cast<NumberOption>();
-
-            number.TitleText.text = Name;
             number.ValidRange = new FloatRange(Min, Max);
             number.Increment = Increment;
             number.Value = number.oldValue = Get();

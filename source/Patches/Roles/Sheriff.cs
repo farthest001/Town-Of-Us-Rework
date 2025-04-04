@@ -1,5 +1,6 @@
 using System;
-using UnityEngine;
+using System.Linq;
+using TownOfUs.Extensions;
 
 namespace TownOfUs.Roles
 {
@@ -8,10 +9,12 @@ namespace TownOfUs.Roles
         public Sheriff(PlayerControl player) : base(player)
         {
             Name = "Sheriff";
-            ImpostorText = () => "Shoot the <color=#FF0000FF>Impostor</color>";
-            TaskText = () => "Kill off the impostor but don't kill crewmates.";
-            Color = Color.yellow;
+            ImpostorText = () => "Shoot The <color=#FF0000FF>Impostor</color>";
+            TaskText = () => "Kill off the impostor but don't kill crewmates";
+            Color = Patches.Colors.Sheriff;
+            LastKilled = DateTime.UtcNow;
             RoleType = RoleEnum.Sheriff;
+            AddToRoleHistory(RoleType);
         }
 
         public PlayerControl ClosestPlayer;
@@ -27,9 +30,13 @@ namespace TownOfUs.Roles
             return (num - (float) timeSpan.TotalMilliseconds) / 1000f;
         }
 
-        internal override bool Criteria()
+        internal override bool GameEnd(LogicGameFlowNormal __instance)
         {
-            return CustomGameOptions.ShowSheriff || base.Criteria();
+            if (Player.Data.IsDead || Player.Data.Disconnected || !CustomGameOptions.CrewKillersContinue) return true;
+
+            if (PlayerControl.AllPlayerControls.ToArray().Count(x => !x.Data.IsDead && !x.Data.Disconnected && x.Data.IsImpostor()) > 0) return false;
+
+            return true;
         }
     }
 }

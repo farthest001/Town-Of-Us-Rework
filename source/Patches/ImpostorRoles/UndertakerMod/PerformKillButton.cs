@@ -1,17 +1,15 @@
 using System;
 using HarmonyLib;
-using Hazel;
-using Reactor.Extensions;
-using TownOfUs.Extensions;
 using TownOfUs.Roles;
 using UnityEngine;
+using AmongUs.GameOptions;
 
 namespace TownOfUs.ImpostorRoles.UndertakerMod
 {
-    [HarmonyPatch(typeof(KillButtonManager), nameof(KillButtonManager.PerformKill))]
+    [HarmonyPatch(typeof(KillButton), nameof(KillButton.DoClick))]
     public class PerformKillButton
     {
-        public static bool Prefix(KillButtonManager __instance)
+        public static bool Prefix(KillButton __instance)
         {
             var flag = PlayerControl.LocalPlayer.Is(RoleEnum.Undertaker);
             if (!flag) return true;
@@ -21,45 +19,61 @@ namespace TownOfUs.ImpostorRoles.UndertakerMod
 
             if (__instance == role.DragDropButton)
             {
-                if (role.DragDropButton.renderer.sprite == TownOfUs.DragSprite)
+                if (role.Player.inVent) return false;
+                if (role.DragDropButton.graphic.sprite == TownOfUs.DragSprite)
                 {
                     if (__instance.isCoolingDown) return false;
                     if (!__instance.enabled) return false;
-                    var maxDistance = GameOptionsData.KillDistances[PlayerControl.GameOptions.KillDistance];
+                    var maxDistance = GameOptionsData.KillDistances[GameOptionsManager.Instance.currentNormalGameOptions.KillDistance];
                     if (Vector2.Distance(role.CurrentTarget.TruePosition,
                         PlayerControl.LocalPlayer.GetTruePosition()) > maxDistance) return false;
                     var playerId = role.CurrentTarget.ParentId;
+                    var player = Utils.PlayerById(playerId);
+                    var abilityUsed = Utils.AbilityUsed(PlayerControl.LocalPlayer);
+                    if (!abilityUsed) return false;
+                    if ((player.IsInfected() || role.Player.IsInfected()) && !player.Is(RoleEnum.Plaguebearer))
+                    {
+                        foreach (var pb in Role.GetRoles(RoleEnum.Plaguebearer)) ((Plaguebearer)pb).RpcSpreadInfection(player, role.Player);
+                    }
 
-                    var writer = AmongUsClient.Instance.StartRpcImmediately(PlayerControl.LocalPlayer.NetId,
-                        (byte) CustomRPC.Drag, SendOption.Reliable, -1);
-                    writer.Write(PlayerControl.LocalPlayer.PlayerId);
-                    writer.Write(playerId);
-                    AmongUsClient.Instance.FinishRpcImmediately(writer);
+                    Utils.Rpc(CustomRPC.Drag, PlayerControl.LocalPlayer.PlayerId, playerId);
 
                     role.CurrentlyDragging = role.CurrentTarget;
 
                     KillButtonTarget.SetTarget(__instance, null, role);
-                    __instance.renderer.sprite = TownOfUs.DropSprite;
+                    __instance.graphic.sprite = TownOfUs.DropSprite;
                     return false;
                 }
                 else
                 {
                     if (!__instance.enabled) return false;
-                    var writer = AmongUsClient.Instance.StartRpcImmediately(PlayerControl.LocalPlayer.NetId,
-                        (byte) CustomRPC.Drop, SendOption.Reliable, -1);
-                    writer.Write(PlayerControl.LocalPlayer.PlayerId);
-                    var position = PlayerControl.LocalPlayer.GetTruePosition();
-                    writer.Write(position);
-                    AmongUsClient.Instance.FinishRpcImmediately(writer);
+                    var abilityUsed = Utils.AbilityUsed(PlayerControl.LocalPlayer);
+                    if (!abilityUsed) return false;
+                    Vector3 position = PlayerControl.LocalPlayer.transform.position;
+
+                    if (Patches.SubmergedCompatibility.isSubmerged())
+                    {
+                        if (position.y > -7f)
+                        {
+                            position.z = 0.0208f;
+                        }
+                        else
+                        {
+                            position.z = -0.0273f;
+                        }
+                    }
+
+                    position.y -= 0.3636f;
+
+                    Utils.Rpc(CustomRPC.Drop, PlayerControl.LocalPlayer.PlayerId, position, position.z);
 
                     var body = role.CurrentlyDragging;
-                    body.bodyRenderer.material.SetFloat("_Outline", 0f);
+                    foreach (var body2 in role.CurrentlyDragging.bodyRenderers) body2.material.SetFloat("_Outline", 0f);
                     role.CurrentlyDragging = null;
-                    __instance.renderer.sprite = TownOfUs.DragSprite;
+                    __instance.graphic.sprite = TownOfUs.DragSprite;
                     role.LastDragged = DateTime.UtcNow;
 
-                    //body.transform.position = position;
-
+                    body.transform.position = position;
 
                     return false;
                 }

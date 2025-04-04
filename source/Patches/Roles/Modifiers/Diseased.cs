@@ -1,5 +1,3 @@
-using UnityEngine;
-
 namespace TownOfUs.Roles.Modifiers
 {
     public class Diseased : Modifier
@@ -8,7 +6,7 @@ namespace TownOfUs.Roles.Modifiers
         {
             Name = "Diseased";
             TaskText = () => "Killing you gives Impostors a high cooldown";
-            Color = Color.grey;
+            Color = Patches.Colors.Diseased;
             ModifierType = ModifierEnum.Diseased;
         }
     }

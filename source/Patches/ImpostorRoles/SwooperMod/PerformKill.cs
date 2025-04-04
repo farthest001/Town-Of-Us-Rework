@@ -1,13 +1,12 @@
 using HarmonyLib;
-using Hazel;
 using TownOfUs.Roles;
 
 namespace TownOfUs.ImpostorRoles.SwooperMod
 {
-    [HarmonyPatch(typeof(KillButtonManager), nameof(KillButtonManager.PerformKill))]
+    [HarmonyPatch(typeof(KillButton), nameof(KillButton.DoClick))]
     public class PerformKill
     {
-        public static bool Prefix(KillButtonManager __instance)
+        public static bool Prefix(KillButton __instance)
         {
             var flag = PlayerControl.LocalPlayer.Is(RoleEnum.Swooper);
             if (!flag) return true;
@@ -17,14 +16,13 @@ namespace TownOfUs.ImpostorRoles.SwooperMod
             if (__instance == role.SwoopButton)
             {
                 if (__instance.isCoolingDown) return false;
+                if (role.Player.inVent) return false;
                 if (!__instance.isActiveAndEnabled) return false;
                 if (role.SwoopTimer() != 0) return false;
+                var abilityUsed = Utils.AbilityUsed(PlayerControl.LocalPlayer);
+                if (!abilityUsed) return false;
 
-                var writer = AmongUsClient.Instance.StartRpcImmediately(PlayerControl.LocalPlayer.NetId,
-                    (byte) CustomRPC.Swoop, SendOption.Reliable, -1);
-                var position = PlayerControl.LocalPlayer.transform.position;
-                writer.Write(PlayerControl.LocalPlayer.PlayerId);
-                AmongUsClient.Instance.FinishRpcImmediately(writer);
+                Utils.Rpc(CustomRPC.Swoop, PlayerControl.LocalPlayer.PlayerId);
                 role.TimeRemaining = CustomGameOptions.SwoopDuration;
                 role.Swoop();
                 return false;

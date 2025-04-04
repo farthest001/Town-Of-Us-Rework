@@ -1,5 +1,4 @@
 using Il2CppSystem.Collections.Generic;
-using UnityEngine;
 
 namespace TownOfUs.Roles
 {
@@ -12,27 +11,29 @@ namespace TownOfUs.Roles
         {
             Name = "Executioner";
             ImpostorText = () =>
-                target == null ? "You don't have a target for some reason... weird..." : $"Vote {target.name} out";
+                target == null ? "You don't have a target for some reason... weird..." : $"Vote {target.name} Out";
             TaskText = () =>
                 target == null
                     ? "You don't have a target for some reason... weird..."
-                    : $"Vote {target.name} out\nFake Tasks:";
-            Color = new Color(0.55f, 0.25f, 0.02f, 1f);
+                    : $"Vote {target.name} out!\nFake Tasks:";
+            Color = Patches.Colors.Executioner;
             RoleType = RoleEnum.Executioner;
-            Faction = Faction.Neutral;
+            AddToRoleHistory(RoleType);
+            Faction = Faction.NeutralEvil;
             Scale = 1.4f;
         }
 
-        protected override void IntroPrefix(IntroCutscene._CoBegin_d__14 __instance)
+        protected override void IntroPrefix(IntroCutscene._ShowTeam_d__38 __instance)
         {
-            var executionerteam = new List<PlayerControl>();
-            executionerteam.Add(PlayerControl.LocalPlayer);
-            __instance.yourTeam = executionerteam;
+            var exeTeam = new List<PlayerControl>();
+            exeTeam.Add(PlayerControl.LocalPlayer);
+            __instance.teamToShow = exeTeam;
         }
 
-        internal override bool EABBNOODFGL(ShipStatus __instance)
+        internal override bool GameEnd(LogicGameFlowNormal __instance)
         {
             if (Player.Data.IsDead) return true;
+            if (!CustomGameOptions.NeutralEvilWinEndsGame) return true;
             if (!TargetVotedOut || !target.Data.IsDead) return true;
             Utils.EndGame();
             return false;
@@ -42,11 +43,6 @@ namespace TownOfUs.Roles
         {
             if (Player.Data.IsDead || Player.Data.Disconnected) return;
             TargetVotedOut = true;
-        }
-
-        public void Loses()
-        {
-            Player.Data.IsImpostor = true;
         }
     }
 }

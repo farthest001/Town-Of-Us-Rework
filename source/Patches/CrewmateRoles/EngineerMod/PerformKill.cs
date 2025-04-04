@@ -1,14 +1,12 @@
-using System.Linq;
 using HarmonyLib;
-using Hazel;
 using TownOfUs.Roles;
 
 namespace TownOfUs.CrewmateRoles.EngineerMod
 {
-    [HarmonyPatch(typeof(KillButtonManager), nameof(KillButtonManager.PerformKill))]
+    [HarmonyPatch(typeof(KillButton), nameof(KillButton.DoClick))]
     public class PerformKill
     {
-        public static bool Prefix(KillButtonManager __instance)
+        public static bool Prefix(KillButton __instance)
         {
             if (__instance != DestroyableSingleton<HudManager>.Instance.KillButton) return true;
             var flag = PlayerControl.LocalPlayer.Is(RoleEnum.Engineer);
@@ -17,15 +15,16 @@ namespace TownOfUs.CrewmateRoles.EngineerMod
             if (PlayerControl.LocalPlayer.Data.IsDead) return false;
             if (!__instance.enabled) return false;
             var role = Role.GetRole<Engineer>(PlayerControl.LocalPlayer);
-            if (role.UsedThisRound) return false;
+            if (!role.ButtonUsable) return false;
             var system = ShipStatus.Instance.Systems[SystemTypes.Sabotage].Cast<SabotageSystemType>();
-            var specials = system.specials.ToArray();
-            var dummyActive = system.dummy.IsActive;
-            var sabActive = specials.Any(s => s.IsActive);
-            if (!sabActive | dummyActive) return false;
-            role.UsedThisRound = true;
-
-            switch (PlayerControl.GameOptions.MapId)
+            if (system == null) return false;
+            var sabActive = system.AnyActive;
+            if (!sabActive) return false;
+            var abilityUsed = Utils.AbilityUsed(PlayerControl.LocalPlayer);
+            if (!abilityUsed) return false;
+            role.UsesLeft -= 1;
+            Utils.Rpc(CustomRPC.EngineerFix, PlayerControl.LocalPlayer.NetId);
+            switch (GameOptionsManager.Instance.currentNormalGameOptions.MapId)
             {
                 case 0:
                 case 3:
@@ -61,58 +60,99 @@ namespace TownOfUs.CrewmateRoles.EngineerMod
                 case 4:
                     var comms4 = ShipStatus.Instance.Systems[SystemTypes.Comms].Cast<HudOverrideSystemType>();
                     if (comms4.IsActive) return FixComms();
-                    var reactor = ShipStatus.Instance.Systems[SystemTypes.Reactor].Cast<HeliSabotageSystem>();
+                    var reactor = ShipStatus.Instance.Systems[SystemTypes.HeliSabotage].Cast<HeliSabotageSystem>();
                     if (reactor.IsActive) return FixAirshipReactor();
                     var lights4 = ShipStatus.Instance.Systems[SystemTypes.Electrical].Cast<SwitchSystem>();
                     if (lights4.IsActive) return FixLights(lights4);
                     break;
+                case 5:
+                    var reactor7 = ShipStatus.Instance.Systems[SystemTypes.Reactor].Cast<ReactorSystemType>();
+                    if (reactor7.IsActive) return FixReactor(SystemTypes.Reactor);
+                    var comms7 = ShipStatus.Instance.Systems[SystemTypes.Comms].Cast<HqHudSystemType>();
+                    if (comms7.IsActive) return FixMiraComms();
+                    var mushroom = ShipStatus.Instance.Systems[SystemTypes.MushroomMixupSabotage].Cast<MushroomMixupSabotageSystem>();
+                    if (mushroom.IsActive)
+                    {
+                        mushroom.currentSecondsUntilHeal = 0.1f;
+                        return false;
+                    } 
+                    break;
+                case 6:
+                    var reactor5 = ShipStatus.Instance.Systems[SystemTypes.Reactor].Cast<ReactorSystemType>();
+                    if (reactor5.IsActive) return FixReactor(SystemTypes.Reactor);
+                    var lights5 = ShipStatus.Instance.Systems[SystemTypes.Electrical].Cast<SwitchSystem>();
+                    if (lights5.IsActive) return FixLights(lights5);
+                    var comms5 = ShipStatus.Instance.Systems[SystemTypes.Comms].Cast<HudOverrideSystemType>();
+                    if (comms5.IsActive) return FixComms();
+                    foreach (PlayerTask i in PlayerControl.LocalPlayer.myTasks)
+                    {
+                        if (i.TaskType == Patches.SubmergedCompatibility.RetrieveOxygenMask)
+                        {
+                            return FixSubOxygen();
+                        }
+                    }
+                    break;
+                case 7:
+                    var comms6 = ShipStatus.Instance.Systems[SystemTypes.Comms].Cast<HudOverrideSystemType>();
+                    if (comms6.IsActive) return FixComms();
+                    var reactor6 = ShipStatus.Instance.Systems[SystemTypes.Reactor].Cast<ReactorSystemType>();
+                    if (reactor6.IsActive) return FixReactor(SystemTypes.Reactor);
+                    var oxygen6 = ShipStatus.Instance.Systems[SystemTypes.LifeSupp].Cast<LifeSuppSystemType>();
+                    if (oxygen6.IsActive) return FixOxygen();
+                    var lights6 = ShipStatus.Instance.Systems[SystemTypes.Electrical].Cast<SwitchSystem>();
+                    if (lights6.IsActive) return FixLights(lights6);
+                    break;
             }
 
-            var writer = AmongUsClient.Instance.StartRpcImmediately(PlayerControl.LocalPlayer.NetId,
-                (byte) CustomRPC.EngineerFix, SendOption.Reliable, -1);
-            writer.Write(PlayerControl.LocalPlayer.NetId);
-            AmongUsClient.Instance.FinishRpcImmediately(writer);
+            
 
             return false;
         }
 
         private static bool FixComms()
         {
-            ShipStatus.Instance.RpcRepairSystem(SystemTypes.Comms, 0);
+            ShipStatus.Instance.RpcUpdateSystem(SystemTypes.Comms, 0);
             return false;
         }
 
         private static bool FixMiraComms()
         {
-            ShipStatus.Instance.RpcRepairSystem(SystemTypes.Comms, 16 | 0);
-            ShipStatus.Instance.RpcRepairSystem(SystemTypes.Comms, 16 | 1);
+            ShipStatus.Instance.RpcUpdateSystem(SystemTypes.Comms, 16 | 0);
+            ShipStatus.Instance.RpcUpdateSystem(SystemTypes.Comms, 16 | 1);
             return false;
         }
 
         private static bool FixAirshipReactor()
         {
-            ShipStatus.Instance.RpcRepairSystem(SystemTypes.Reactor, 16 | 0);
-            ShipStatus.Instance.RpcRepairSystem(SystemTypes.Reactor, 16 | 1);
+            ShipStatus.Instance.RpcUpdateSystem(SystemTypes.HeliSabotage, 16 | 0);
+            ShipStatus.Instance.RpcUpdateSystem(SystemTypes.HeliSabotage, 16 | 1);
             return false;
         }
 
         private static bool FixReactor(SystemTypes system)
         {
-            ShipStatus.Instance.RpcRepairSystem(system, 16);
+            ShipStatus.Instance.RpcUpdateSystem(system, 16);
             return false;
         }
 
         private static bool FixOxygen()
         {
-            ShipStatus.Instance.RpcRepairSystem(SystemTypes.LifeSupp, 16);
+            ShipStatus.Instance.RpcUpdateSystem(SystemTypes.LifeSupp, 16);
+            return false;
+        }
+
+        private static bool FixSubOxygen()
+        {
+            Patches.SubmergedCompatibility.RepairOxygen();
+
+            Utils.Rpc(CustomRPC.SubmergedFixOxygen, PlayerControl.LocalPlayer.NetId);
+
             return false;
         }
 
         private static bool FixLights(SwitchSystem lights)
         {
-            var writer = AmongUsClient.Instance.StartRpcImmediately(PlayerControl.LocalPlayer.NetId,
-                (byte) CustomRPC.FixLights, SendOption.Reliable, -1);
-            AmongUsClient.Instance.FinishRpcImmediately(writer);
+            Utils.Rpc(CustomRPC.FixLights);
 
             lights.ActualSwitches = lights.ExpectedSwitches;
 

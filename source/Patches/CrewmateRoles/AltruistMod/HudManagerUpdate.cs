@@ -1,6 +1,7 @@
 using HarmonyLib;
 using TownOfUs.Roles;
 using UnityEngine;
+using AmongUs.GameOptions;
 
 namespace TownOfUs.CrewmateRoles.AltruistMod
 {
@@ -16,16 +17,22 @@ namespace TownOfUs.CrewmateRoles.AltruistMod
 
             var role = Role.GetRole<Altruist>(PlayerControl.LocalPlayer);
 
+            var killButton = __instance.KillButton;
+
+            killButton.gameObject.SetActive((__instance.UseButton.isActiveAndEnabled || __instance.PetButton.isActiveAndEnabled)
+                    && !MeetingHud.Instance && !PlayerControl.LocalPlayer.Data.IsDead
+                    && AmongUsClient.Instance.GameState == InnerNet.InnerNetClient.GameStates.Started);
+
             var data = PlayerControl.LocalPlayer.Data;
             var isDead = data.IsDead;
             var truePosition = PlayerControl.LocalPlayer.GetTruePosition();
-            var maxDistance = GameOptionsData.KillDistances[PlayerControl.GameOptions.KillDistance];
-            var flag = (PlayerControl.GameOptions.GhostsDoTasks || !data.IsDead) &&
+            var maxDistance = GameOptionsData.KillDistances[GameOptionsManager.Instance.currentNormalGameOptions.KillDistance];
+            var flag = (GameOptionsManager.Instance.currentNormalGameOptions.GhostsDoTasks || !data.IsDead) &&
                        (!AmongUsClient.Instance || !AmongUsClient.Instance.IsGameOver) &&
                        PlayerControl.LocalPlayer.CanMove;
             var allocs = Physics2D.OverlapCircleAll(truePosition, maxDistance,
-                LayerMask.GetMask(new[] {"Players", "Ghost"}));
-            var killButton = __instance.KillButton;
+                LayerMask.GetMask(new[] { "Players", "Ghost" }));
+
             DeadBody closestBody = null;
             var closestDistance = float.MaxValue;
 
@@ -33,8 +40,6 @@ namespace TownOfUs.CrewmateRoles.AltruistMod
             {
                 if (!flag || isDead || collider2D.tag != "DeadBody") continue;
                 var component = collider2D.GetComponent<DeadBody>();
-
-
                 if (!(Vector2.Distance(truePosition, component.TruePosition) <=
                       maxDistance)) continue;
 
@@ -42,17 +47,6 @@ namespace TownOfUs.CrewmateRoles.AltruistMod
                 if (!(distance < closestDistance)) continue;
                 closestBody = component;
                 closestDistance = distance;
-            }
-
-            if (isDead)
-            {
-                killButton.gameObject.SetActive(false);
-                killButton.isActive = false;
-            }
-            else
-            {
-                killButton.gameObject.SetActive(!MeetingHud.Instance);
-                killButton.isActive = !MeetingHud.Instance;
             }
 
             KillButtonTarget.SetTarget(killButton, closestBody, role);

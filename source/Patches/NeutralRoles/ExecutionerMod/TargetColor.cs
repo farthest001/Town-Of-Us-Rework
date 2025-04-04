@@ -1,6 +1,7 @@
 using HarmonyLib;
-using Hazel;
+using TownOfUs.Extensions;
 using TownOfUs.Roles;
+using TownOfUs.Roles.Modifiers;
 using UnityEngine;
 
 namespace TownOfUs.NeutralRoles.ExecutionerMod
@@ -8,6 +9,8 @@ namespace TownOfUs.NeutralRoles.ExecutionerMod
     public enum OnTargetDead
     {
         Crew,
+        Amnesiac,
+        Survivor,
         Jester
     }
 
@@ -27,30 +30,26 @@ namespace TownOfUs.NeutralRoles.ExecutionerMod
             if (PlayerControl.LocalPlayer == null) return;
             if (PlayerControl.LocalPlayer.Data == null) return;
             if (!PlayerControl.LocalPlayer.Is(RoleEnum.Executioner)) return;
-            var role = Role.GetRole<Executioner>(PlayerControl.LocalPlayer);
+            if (PlayerControl.LocalPlayer.Data.IsDead) return;
 
-            if (role.target == null)
-            {
-                var writer2 = AmongUsClient.Instance.StartRpcImmediately(PlayerControl.LocalPlayer.NetId,
-                    (byte) CustomRPC.ExecutionerToJester, SendOption.Reliable, -1);
-                writer2.Write(PlayerControl.LocalPlayer.PlayerId);
-                AmongUsClient.Instance.FinishRpcImmediately(writer2);
-                ExeToJes(PlayerControl.LocalPlayer);
-                return;
-            }
+            var role = Role.GetRole<Executioner>(PlayerControl.LocalPlayer);
 
             if (MeetingHud.Instance != null) UpdateMeeting(MeetingHud.Instance, role);
 
-            role.target.nameText.color = Color.black;
+            if (!PlayerControl.LocalPlayer.IsHypnotised())
+            {
+                if (role.target && role.target.nameText())
+                {
+                    var colour = Color.black;
+                    if (role.target.Is(ModifierEnum.Shy)) colour.a = Modifier.GetModifier<Shy>(role.target).Opacity;
+                    role.target.nameText().color = colour;
+                }
+            }
 
-            if (PlayerControl.LocalPlayer.Data.IsDead) return;
-            if (!role.target.Data.IsDead && !role.target.Data.Disconnected) return;
+            if (!role.target.Data.IsDead && !role.target.Data.Disconnected && !role.target.Is(RoleEnum.Vampire)) return;
             if (role.TargetVotedOut) return;
 
-            var writer = AmongUsClient.Instance.StartRpcImmediately(PlayerControl.LocalPlayer.NetId,
-                (byte) CustomRPC.ExecutionerToJester, SendOption.Reliable, -1);
-            writer.Write(PlayerControl.LocalPlayer.PlayerId);
-            AmongUsClient.Instance.FinishRpcImmediately(writer);
+            Utils.Rpc(CustomRPC.ExecutionerToJester, PlayerControl.LocalPlayer.PlayerId);
 
             ExeToJes(PlayerControl.LocalPlayer);
         }
@@ -64,11 +63,20 @@ namespace TownOfUs.NeutralRoles.ExecutionerMod
             if (CustomGameOptions.OnTargetDead == OnTargetDead.Jester)
             {
                 var jester = new Jester(player);
-                var task = new GameObject("JesterTask").AddComponent<ImportantTextTask>();
-                task.transform.SetParent(player.transform, false);
-                task.Text =
-                    $"{jester.ColorString}Role: {jester.Name}\nYour target was killed. Now you get voted out!\nFake Tasks:[]";
-                player.myTasks.Insert(0, task);
+                jester.SpawnedAs = false;
+                jester.RegenTask();
+            }
+            else if (CustomGameOptions.OnTargetDead == OnTargetDead.Amnesiac)
+            {
+                var amnesiac = new Amnesiac(player);
+                amnesiac.SpawnedAs = false;
+                amnesiac.RegenTask();
+            }
+            else if (CustomGameOptions.OnTargetDead == OnTargetDead.Survivor)
+            {
+                var surv = new Survivor(player);
+                surv.SpawnedAs = false;
+                surv.RegenTask();
             }
             else
             {

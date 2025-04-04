@@ -1,6 +1,7 @@
 using HarmonyLib;
 using TownOfUs.Roles.Modifiers;
 using UnityEngine;
+using TMPro;
 
 namespace TownOfUs.Modifiers.ButtonBarryMod
 {
@@ -20,34 +21,41 @@ namespace TownOfUs.Modifiers.ButtonBarryMod
             if (PlayerControl.LocalPlayer == null) return;
             if (PlayerControl.LocalPlayer.Data == null) return;
             if (!PlayerControl.LocalPlayer.Is(ModifierEnum.ButtonBarry)) return;
-            if (PlayerControl.LocalPlayer.Is(RoleEnum.Swapper)) return;
             if (PlayerControl.LocalPlayer.Is(RoleEnum.Glitch)) return;
-
-            var data = PlayerControl.LocalPlayer.Data;
-            var isDead = data.IsDead;
-
 
             var role = Modifier.GetModifier<ButtonBarry>(PlayerControl.LocalPlayer);
 
             if (role.ButtonButton == null)
             {
-                role.ButtonButton = Object.Instantiate(__instance.KillButton, HudManager.Instance.transform);
-                role.ButtonButton.renderer.enabled = true;
-                role.ButtonButton.renderer.sprite = Button;
+                role.ButtonButton = Object.Instantiate(__instance.KillButton, __instance.transform.parent);
+                foreach (var text in role.ButtonButton.GetComponentsInChildren<TextMeshPro>()) text.text = "";
+                role.ButtonButton.graphic.enabled = true;
+                role.ButtonButton.graphic.sprite = Button;
             }
 
-            role.ButtonButton.renderer.sprite = Button;
+            role.ButtonButton.graphic.sprite = Button;
 
+            role.ButtonButton.gameObject.SetActive((__instance.UseButton.isActiveAndEnabled || __instance.PetButton.isActiveAndEnabled)
+                    && !MeetingHud.Instance && !PlayerControl.LocalPlayer.Data.IsDead
+                    && AmongUsClient.Instance.GameState == InnerNet.InnerNetClient.GameStates.Started);
 
-            role.ButtonButton.gameObject.SetActive(!PlayerControl.LocalPlayer.Data.IsDead && !MeetingHud.Instance);
+            role.ButtonButton.SetCoolDown(role.StartTimer(), 10f);
+            var renderer = role.ButtonButton.graphic;
 
-            role.ButtonButton.SetCoolDown(0f, 1f);
-            var renderer = role.ButtonButton.renderer;
-
-            var position1 = __instance.UseButton.transform.position;
-            role.ButtonButton.transform.position = new Vector3(
-                Camera.main.ScreenToWorldPoint(new Vector3(0, 0)).x + 0.75f, position1.y,
-                position1.z);
+            if (__instance.UseButton != null)
+            {
+                var position1 = __instance.UseButton.transform.position;
+                role.ButtonButton.transform.position = new Vector3(
+                    Camera.main.ScreenToWorldPoint(new Vector3(0, 0)).x + 0.75f, position1.y,
+                    position1.z);
+            }
+            else
+            {
+                var position1 = __instance.PetButton.transform.position;
+                role.ButtonButton.transform.position = new Vector3(
+                    Camera.main.ScreenToWorldPoint(new Vector3(0, 0)).x + 0.75f, position1.y,
+                    position1.z);
+            }
 
             if (!role.ButtonUsed && PlayerControl.LocalPlayer.RemainingEmergencies > 0)
             {

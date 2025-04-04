@@ -2,29 +2,37 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using InnerNet;
-using Reactor.Extensions;
+using Reactor.Utilities.Extensions;
 using TownOfUs.CrewmateRoles.MedicMod;
 using TownOfUs.Extensions;
 using TownOfUs.Roles;
+using TownOfUs.Patches;
 using UnityEngine;
-using Object = UnityEngine.Object;
+using TownOfUs.Roles.Modifiers;
+using AmongUs.GameOptions;
+using Reactor.Utilities;
 
 namespace TownOfUs.CrewmateRoles.AltruistMod
 {
     public class Coroutine
     {
-        public static ArrowBehaviour Arrow;
-        public static PlayerControl Target;
+        public static Dictionary<PlayerControl, ArrowBehaviour> Revived = new();
         public static Sprite Sprite => TownOfUs.Arrow;
 
         public static IEnumerator AltruistRevive(DeadBody target, Altruist role)
         {
-            var parentId = target.ParentId;
+            if (PlayerControl.LocalPlayer.Is(RoleEnum.Lookout))
+            {
+                var lookout = Role.GetRole<Lookout>(PlayerControl.LocalPlayer);
+                if (lookout.Watching.ContainsKey(target.ParentId))
+                {
+                    if (!lookout.Watching[target.ParentId].Contains(RoleEnum.Altruist)) lookout.Watching[target.ParentId].Add(RoleEnum.Altruist);
+                }
+            }
+
+            var parent = Utils.PlayerById(target.ParentId);
             var position = target.TruePosition;
-
-            var revived = new List<PlayerControl>();
-
+            var altruist = role.Player;
 
             if (AmongUsClient.Instance.AmHost) Utils.RpcMurderPlayer(role.Player, role.Player);
 
@@ -49,29 +57,46 @@ namespace TownOfUs.CrewmateRoles.AltruistMod
                 if (MeetingHud.Instance) yield break;
             }
 
+            if (!AmongUsClient.Instance.AmHost || parent.Data.Disconnected) yield break;
+
+            AltruistReviveEnd(altruist, parent, position.x, position.y + 0.3636f);
+            Utils.Rpc(CustomRPC.AltruistRevive, altruist.PlayerId, (byte)1, parent.PlayerId, position.x, position.y + 0.3636f);
+        }
+
+        public static void AltruistReviveEnd(PlayerControl altruist, PlayerControl player, float x, float y)
+        {
+            var revived = new List<PlayerControl>();
+
             foreach (DeadBody deadBody in GameObject.FindObjectsOfType<DeadBody>())
             {
-                if (deadBody.ParentId == role.Player.PlayerId) deadBody.gameObject.Destroy();
+                if (deadBody.ParentId == altruist.PlayerId) deadBody.gameObject.Destroy();
             }
 
-            var player = Utils.PlayerById(parentId);
-
-            // if (player == null || AmongUsClient.Instance.GameState != InnerNetClient.GameStates.Started)
-            //     yield break;
-
             player.Revive();
+            if (player.Is(Faction.Impostors)) RoleManager.Instance.SetRole(player, RoleTypes.Impostor);
+            else RoleManager.Instance.SetRole(player, RoleTypes.Crewmate);
             Murder.KilledPlayers.Remove(
                 Murder.KilledPlayers.FirstOrDefault(x => x.PlayerId == player.PlayerId));
             revived.Add(player);
-            player.NetTransform.SnapTo(position);
+            player.transform.position = new Vector2(x, y);
+            if (PlayerControl.LocalPlayer == player) PlayerControl.LocalPlayer.NetTransform.RpcSnapTo(new Vector2(x, y));
 
-            if (target != null) Object.Destroy(target.gameObject);
-
-            if (player.isLover() && CustomGameOptions.BothLoversDie)
+            if (Patches.SubmergedCompatibility.isSubmerged() && PlayerControl.LocalPlayer.PlayerId == player.PlayerId)
             {
-                var lover = Role.GetRole<Lover>(player).OtherLover.Player;
+                Patches.SubmergedCompatibility.ChangeFloor(player.transform.position.y > -7);
+            }
+            foreach (DeadBody deadBody in GameObject.FindObjectsOfType<DeadBody>())
+            {
+                if (deadBody.ParentId == player.PlayerId) deadBody.gameObject.Destroy();
+            }
+
+            if (player.IsLover() && CustomGameOptions.BothLoversDie)
+            {
+                var lover = Modifier.GetModifier<Lover>(player).OtherLover.Player;
 
                 lover.Revive();
+                if (lover.Is(Faction.Impostors)) RoleManager.Instance.SetRole(lover, RoleTypes.Impostor);
+                else RoleManager.Instance.SetRole(lover, RoleTypes.Crewmate);
                 Murder.KilledPlayers.Remove(
                     Murder.KilledPlayers.FirstOrDefault(x => x.PlayerId == lover.PlayerId));
                 revived.Add(lover);
@@ -80,6 +105,13 @@ namespace TownOfUs.CrewmateRoles.AltruistMod
                 {
                     if (deadBody.ParentId == lover.PlayerId)
                     {
+                        lover.transform.position = new Vector2(deadBody.TruePosition.x, deadBody.TruePosition.y + 0.3636f);
+                        if (PlayerControl.LocalPlayer == lover) PlayerControl.LocalPlayer.NetTransform.RpcSnapTo(new Vector2(deadBody.TruePosition.x, deadBody.TruePosition.y + 0.3636f));
+
+                        if (Patches.SubmergedCompatibility.isSubmerged() && PlayerControl.LocalPlayer.PlayerId == lover.PlayerId)
+                        {
+                            Patches.SubmergedCompatibility.ChangeFloor(lover.transform.position.y > -7);
+                        }
                         deadBody.gameObject.Destroy();
                     }
                 }
@@ -95,19 +127,21 @@ namespace TownOfUs.CrewmateRoles.AltruistMod
                 {
                 }
 
-
-            if (PlayerControl.LocalPlayer.Data.IsImpostor || PlayerControl.LocalPlayer.Is(RoleEnum.Glitch))
+            if ((PlayerControl.LocalPlayer.Data.IsImpostor() || PlayerControl.LocalPlayer.Is(Faction.NeutralKilling)) && !revived.Contains(PlayerControl.LocalPlayer))
             {
                 var gameObj = new GameObject();
-                Arrow = gameObj.AddComponent<ArrowBehaviour>();
+                var Arrow = gameObj.AddComponent<ArrowBehaviour>();
                 gameObj.transform.parent = PlayerControl.LocalPlayer.gameObject.transform;
                 var renderer = gameObj.AddComponent<SpriteRenderer>();
                 renderer.sprite = Sprite;
                 Arrow.image = renderer;
                 gameObj.layer = 5;
-                Target = player;
-                yield return Utils.FlashCoroutine(role.Color, 1f, 0.5f);
+                Revived.Add(player, Arrow);
+                //Target = player;
+                Coroutines.Start(Utils.FlashCoroutine(Colors.Altruist, 1f, 0.5f));
             }
+
+            foreach (var revive in revived) Utils.Unmorph(revive);
         }
     }
 }

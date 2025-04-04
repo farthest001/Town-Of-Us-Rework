@@ -1,5 +1,3 @@
-using UnityEngine;
-
 namespace TownOfUs.Roles
 {
     public class Impostor : Role
@@ -10,6 +8,7 @@ namespace TownOfUs.Roles
             Hidden = true;
             Faction = Faction.Impostors;
             RoleType = RoleEnum.Impostor;
+            AddToRoleHistory(RoleType);
             Color = Palette.ImpostorRed;
         }
     }
@@ -22,7 +21,8 @@ namespace TownOfUs.Roles
             Hidden = true;
             Faction = Faction.Crewmates;
             RoleType = RoleEnum.Crewmate;
-            Color = Color.white;
+            AddToRoleHistory(RoleType);
+            Color = Patches.Colors.Crewmate;
         }
     }
 }

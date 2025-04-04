@@ -1,33 +1,35 @@
 using Il2CppSystem.Collections.Generic;
-using UnityEngine;
 
 namespace TownOfUs.Roles
 {
     public class Jester : Role
     {
         public bool VotedOut;
+        public bool SpawnedAs = true;
 
 
         public Jester(PlayerControl player) : base(player)
         {
             Name = "Jester";
-            ImpostorText = () => "Get voted out";
-            TaskText = () => "Get voted out!\nFake Tasks:";
-            Color = new Color(1f, 0.75f, 0.8f, 1f);
+            ImpostorText = () => "Get Voted Out";
+            TaskText = () => SpawnedAs ? "Get voted out!\nFake Tasks:" : "Your target was killed. Now you get voted out!\nFake Tasks:";
+            Color = Patches.Colors.Jester;
             RoleType = RoleEnum.Jester;
-            Faction = Faction.Neutral;
+            AddToRoleHistory(RoleType);
+            Faction = Faction.NeutralEvil;
         }
 
-        protected override void IntroPrefix(IntroCutscene._CoBegin_d__14 __instance)
+        protected override void IntroPrefix(IntroCutscene._ShowTeam_d__38 __instance)
         {
-            var jesterTeam = new List<PlayerControl>();
-            jesterTeam.Add(PlayerControl.LocalPlayer);
-            __instance.yourTeam = jesterTeam;
+            var jestTeam = new List<PlayerControl>();
+            jestTeam.Add(PlayerControl.LocalPlayer);
+            __instance.teamToShow = jestTeam;
         }
 
-        internal override bool EABBNOODFGL(ShipStatus __instance)
+        internal override bool GameEnd(LogicGameFlowNormal __instance)
         {
             if (!VotedOut || !Player.Data.IsDead && !Player.Data.Disconnected) return true;
+            if (!CustomGameOptions.NeutralEvilWinEndsGame) return true;
             Utils.EndGame();
             return false;
         }
@@ -36,11 +38,6 @@ namespace TownOfUs.Roles
         {
             //System.Console.WriteLine("Reached Here - Jester edition");
             VotedOut = true;
-        }
-
-        public void Loses()
-        {
-            Player.Data.IsImpostor = true;
         }
     }
 }

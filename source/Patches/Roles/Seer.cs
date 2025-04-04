@@ -1,7 +1,5 @@
 using System;
 using System.Collections.Generic;
-using TownOfUs.CrewmateRoles.SeerMod;
-using UnityEngine;
 
 namespace TownOfUs.Roles
 {
@@ -12,10 +10,12 @@ namespace TownOfUs.Roles
         public Seer(PlayerControl player) : base(player)
         {
             Name = "Seer";
-            ImpostorText = () => "Investigate roles";
-            TaskText = () => "Investigate roles and find the Impostor";
-            Color = new Color(1f, 0.8f, 0.5f, 1f);
+            ImpostorText = () => "Reveal The Alliance Of Other Players";
+            TaskText = () => "Reveal alliances of other players to find the Impostors";
+            Color = Patches.Colors.Seer;
+            LastInvestigated = DateTime.UtcNow;
             RoleType = RoleEnum.Seer;
+            AddToRoleHistory(RoleType);
         }
 
         public PlayerControl ClosestPlayer;
@@ -29,24 +29,6 @@ namespace TownOfUs.Roles
             var flag2 = num - (float) timeSpan.TotalMilliseconds < 0f;
             if (flag2) return 0;
             return (num - (float) timeSpan.TotalMilliseconds) / 1000f;
-        }
-
-        public bool CheckSeeReveal(PlayerControl player)
-        {
-            var role = GetRole(player);
-            switch (CustomGameOptions.SeeReveal)
-            {
-                case SeeReveal.All:
-                    return true;
-                case SeeReveal.Nobody:
-                    return false;
-                case SeeReveal.ImpsAndNeut:
-                    return role != null && role.Faction != Faction.Crewmates || player.Data.IsImpostor;
-                case SeeReveal.Crew:
-                    return role != null && role.Faction == Faction.Crewmates || !player.Data.IsImpostor;
-            }
-
-            return false;
         }
     }
 }

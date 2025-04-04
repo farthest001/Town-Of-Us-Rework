@@ -8,24 +8,26 @@ namespace TownOfUs.Roles
     {
         public readonly List<Vent> Vents = new List<Vent>();
 
-        public KillButtonManager _mineButton;
+        public KillButton _mineButton;
         public DateTime LastMined;
 
 
         public Miner(PlayerControl player) : base(player)
         {
             Name = "Miner";
-            ImpostorText = () => "From the top, make it drop, that's a vent";
-            TaskText = () => "From the top, make it drop, that's a vent";
-            Color = Palette.ImpostorRed;
+            ImpostorText = () => "From The Top, Make It Drop, That's A Vent";
+            TaskText = () => "Place vents around the map";
+            Color = Patches.Colors.Impostor;
+            LastMined = DateTime.UtcNow;
             RoleType = RoleEnum.Miner;
+            AddToRoleHistory(RoleType);
             Faction = Faction.Impostors;
         }
 
         public bool CanPlace { get; set; }
         public Vector2 VentSize { get; set; }
 
-        public KillButtonManager MineButton
+        public KillButton MineButton
         {
             get => _mineButton;
             set

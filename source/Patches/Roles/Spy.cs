@@ -1,5 +1,3 @@
-using UnityEngine;
-
 namespace TownOfUs.Roles
 {
     public class Spy : Role
@@ -7,10 +5,11 @@ namespace TownOfUs.Roles
         public Spy(PlayerControl player) : base(player)
         {
             Name = "Spy";
-            ImpostorText = () => "Snoop around and find stuff out";
-            TaskText = () => "Spy on people and find the Impostors";
-            Color = new Color(0.8f, 0.64f, 0.8f, 1f);
+            ImpostorText = () => "Snoop Around And Find Stuff Out";
+            TaskText = () => "Gain extra information on the Admin Table";
+            Color = Patches.Colors.Spy;
             RoleType = RoleEnum.Spy;
+            AddToRoleHistory(RoleType);
         }
     }
 }

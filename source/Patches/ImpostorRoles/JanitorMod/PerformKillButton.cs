@@ -1,16 +1,16 @@
 using HarmonyLib;
-using Hazel;
-using Reactor;
+using Reactor.Utilities;
 using TownOfUs.Roles;
 using UnityEngine;
+using AmongUs.GameOptions;
 
 namespace TownOfUs.ImpostorRoles.JanitorMod
 {
-    [HarmonyPatch(typeof(KillButtonManager), nameof(KillButtonManager.PerformKill))]
+    [HarmonyPatch(typeof(KillButton), nameof(KillButton.DoClick))]
     public class PerformKillButton
 
     {
-        public static bool Prefix(KillButtonManager __instance)
+        public static bool Prefix(KillButton __instance)
         {
             var flag = PlayerControl.LocalPlayer.Is(RoleEnum.Janitor);
             if (!flag) return true;
@@ -23,16 +23,20 @@ namespace TownOfUs.ImpostorRoles.JanitorMod
                 var flag2 = __instance.isCoolingDown;
                 if (flag2) return false;
                 if (!__instance.enabled) return false;
-                var maxDistance = GameOptionsData.KillDistances[PlayerControl.GameOptions.KillDistance];
+                if (role.Player.inVent) return false;
+                var maxDistance = GameOptionsData.KillDistances[GameOptionsManager.Instance.currentNormalGameOptions.KillDistance];
                 if (Vector2.Distance(role.CurrentTarget.TruePosition,
                     PlayerControl.LocalPlayer.GetTruePosition()) > maxDistance) return false;
                 var playerId = role.CurrentTarget.ParentId;
+                var player = Utils.PlayerById(playerId);
+                var abilityUsed = Utils.AbilityUsed(PlayerControl.LocalPlayer);
+                if (!abilityUsed) return false;
+                if (player.IsInfected() || role.Player.IsInfected())
+                {
+                    foreach (var pb in Role.GetRoles(RoleEnum.Plaguebearer)) ((Plaguebearer)pb).RpcSpreadInfection(player, role.Player);
+                }
 
-                var writer = AmongUsClient.Instance.StartRpcImmediately(PlayerControl.LocalPlayer.NetId,
-                    (byte) CustomRPC.JanitorClean, SendOption.Reliable, -1);
-                writer.Write(PlayerControl.LocalPlayer.PlayerId);
-                writer.Write(playerId);
-                AmongUsClient.Instance.FinishRpcImmediately(writer);
+                Utils.Rpc(CustomRPC.JanitorClean, PlayerControl.LocalPlayer.PlayerId, playerId);
 
                 Coroutines.Start(Coroutine.CleanCoroutine(role.CurrentTarget, role));
                 return false;
